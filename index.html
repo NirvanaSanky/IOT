@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket MQTT</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+  <h1>WebSocket MQTT Client</h1>
+  <button id="connect-btn">Connect to Broker</button>
+  <button id="disconnect-btn" disabled>Disconnect</button>
+  <button id="subscribe-btn" disabled>Subscribe</button>
+  <button id="unsubscribe-btn" disabled>Unsubscribe</button>
+  <button id="publish-btn" disabled>Send Message</button>
+  <p id="status">Status: Not connected</p>
+  <h2>Messages:</h2>
+  <div id="messages" style="border: 1px solid #000; padding: 10px; height: 200px; overflow-y: auto;">
+    <em>No messages received</em>
+  </div>
+  <script>
+    const clientId = 'mqttjs_' + Math.random().toString(16).substr(2, 8);
+    const host = 'ws://broker.emqx.io:8083/mqtt';
+    const topic = 'test/topic';
+
+    const options = {
+      keepalive: 60,
+      clientId: clientId,
+      protocolId: 'MQTT',
+      protocolVersion: 4,
+      clean: true,
+      reconnectPeriod: 1000,
+      connectTimeout: 30 * 1000,
+      will: {
+        topic: 'WillMsg',
+        payload: 'Connection Closed abnormally..!',
+        qos: 0,
+        retain: false,
+      },
+    };
+
+    let client = null;
+
+    // Tombol dan status
+    const connectBtn = document.getElementById('connect-btn');
+    const disconnectBtn = document.getElementById('disconnect-btn');
+    const subscribeBtn = document.getElementById('subscribe-btn');
+    const unsubscribeBtn = document.getElementById('unsubscribe-btn');
+    const publishBtn = document.getElementById('publish-btn');
+    const statusText = document.getElementById('status');
+    const messagesDiv = document.getElementById('messages');
+
+    // Tambahkan pesan ke layar
+    const appendMessage = (message) => {
+      const messageEl = document.createElement('div');
+      messageEl.textContent = message;
+      messagesDiv.appendChild(messageEl);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    };
+
+    connectBtn.addEventListener('click', () => {
+      if (!client) {
+        console.log('Connecting MQTT client...');
+        client = mqtt.connect(host, options);
+
+        client.on('connect', () => {
+          console.log('Connected to broker');
+          statusText.textContent = 'Status: Connected';
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          subscribeBtn.disabled = false;
+          unsubscribeBtn.disabled = false;
+          publishBtn.disabled = false;
+        });
+
+        client.on('error', (err) => {
+          console.log('Connection error: ', err);
+          client.end();
+          statusText.textContent = 'Status: Connection error';
+        });
+
+        client.on('reconnect', () => {
+          console.log('Reconnecting...');
+          statusText.textContent = 'Status: Reconnecting...';
+        });
+
+        client.on('close', () => {
+          console.log('Disconnected from broker');
+          statusText.textContent = 'Status: Disconnected';
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          subscribeBtn.disabled = true;
+          unsubscribeBtn.disabled = true;
+          publishBtn.disabled = true;
+        });
+
+        client.on('message', (topic, message) => {
+          console.log(`Received message: ${message.toString()} from topic: ${topic}`);
+          appendMessage(`Topic: ${topic} | Message: ${message.toString()}`);
+        });
+      }
+    });
+
+    disconnectBtn.addEventListener('click', () => {
+      if (client) {
+        client.end();
+        console.log('Disconnected from broker');
+        statusText.textContent = 'Status: Disconnected';
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        subscribeBtn.disabled = true;
+        unsubscribeBtn.disabled = true;
+        publishBtn.disabled = true;
+      }
+    });
+
+    subscribeBtn.addEventListener('click', () => {
+      if (client) {
+        client.subscribe(topic, (err) => {
+          if (!err) {
+            console.log(`Subscribed to topic: ${topic}`);
+            appendMessage(`Subscribed to topic: ${topic}`);
+          } else {
+            console.log('Subscribe error:', err);
+          }
+        });
+      }
+    });
+
+    unsubscribeBtn.addEventListener('click', () => {
+      if (client) {
+        client.unsubscribe(topic, (err) => {
+          if (!err) {
+            console.log(`Unsubscribed from topic: ${topic}`);
+            appendMessage(`Unsubscribed from topic: ${topic}`);
+          } else {
+            console.log('Unsubscribe error:', err);
+          }
+        });
+      }
+    });
+
+    publishBtn.addEventListener('click', () => {
+      if (client) {
+        const message = 'Hello, World!';
+        client.publish(topic, message, (err) => {
+          if (!err) {
+            console.log(`Message "${message}" published to topic: ${topic}`);
+            appendMessage(`Published message: "${message}" to topic: ${topic}`);
+          } else {
+            console.log('Publish error:', err);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
